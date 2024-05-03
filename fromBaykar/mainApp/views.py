@@ -29,13 +29,9 @@ from django.utils.http import urlsafe_base64_decode
 
 from django.core.mail import EmailMessage
 
+import random, string
 
-# Create your views here.
-
-
-def homepage(request):
-    return HttpResponse("Hello")
-
+from .functions import *
 
 @csrf_exempt
 def register(request):
@@ -145,11 +141,10 @@ def login(request):
             refresh_token = str(refresh)
             
             response_data = {
-                    "success": True,
-                    "statusCode": '200-OK',
-                    "message": "Giris Basarili",
-                    "data": {'user' : user_dict, 'access_token':access_token},
-                    
+                "success": True,
+                "statusCode": '200-OK',
+                "message": "Giris Basarili",
+                "data": {'user' : user_dict, 'access_token':access_token},
             }
             return JsonResponse(response_data, status=200) 
         
@@ -212,10 +207,10 @@ def forgot_password(request):
             
             else:
                 response_data = {
-                "success": False,
-                "statusCode": '400-BadRequest',
-                "message": "E-Posta adresiniz dogrulanamadi. Lutfen bilgilerinizi kontrol ediniz.",
-                "data": None,
+                    "success": False,
+                    "statusCode": '400-BadRequest',
+                    "message": "E-Posta adresiniz dogrulanamadi. Lutfen bilgilerinizi kontrol ediniz.",
+                    "data": None,
                 }
                 return JsonResponse(response_data, status=400)
             
@@ -247,10 +242,10 @@ def reset_password_validate(request, uidb64, token):
     
     else:
         response_data = {
-        "success": False,
-        "statusCode": '400-BadRequest',
-        "message": "Sifre yenileme linkinin suresi dolmustur, lutfen tekrar yenileme e-postasi aliniz.",
-        "data": None,
+            "success": False,
+            "statusCode": '400-BadRequest',
+            "message": "Sifre yenileme linkinin suresi dolmustur, lutfen tekrar yenileme e-postasi aliniz.",
+            "data": None,
         }
         return JsonResponse(response_data, status=400)
 
@@ -265,6 +260,7 @@ def reset_password(request):
 
             new_password1 = form.cleaned_data['new_password1']
             new_password2 = form.cleaned_data['new_password2']
+            
             if new_password1 == new_password2:
                 user = User.objects.get(pk=uid)
                 user.set_password(new_password1)
@@ -277,12 +273,13 @@ def reset_password(request):
                     "data": None, 
                 }
                 return JsonResponse(response_data, status=200)
+            
             else:
                 response_data = {
-                "success": False,
-                "statusCode": '400-BadRequest',
-                "message": "Girilen sifreler ayni degildir. Lutfen tekrar deneyiniz.",
-                "data": None,
+                    "success": False,
+                    "statusCode": '400-BadRequest',
+                    "message": "Girilen sifreler ayni degildir. Lutfen tekrar deneyiniz.",
+                    "data": None,
                 }
                 return JsonResponse(response_data, status=400)
     else:
@@ -297,6 +294,7 @@ def reset_password(request):
 def change_password(request):
     if request.method == 'POST':
         form = PasswordChangeForm(request.user, request.POST)
+        
         if form.is_valid():
             user = form.save()
             update_session_auth_hash(request, user)
@@ -307,6 +305,7 @@ def change_password(request):
                 "data": None, 
             }
             return JsonResponse(response_data, status=200) 
+        
         else:
             response_data = {
                 "success": False,
@@ -323,3 +322,83 @@ def change_password(request):
 
     return render(request, 'accounts/change-password.html', context)
 
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def create_vehicle(request):
+    """
+        HTTP Method : POST 
+        Detail : View that enables the creation of IHA (approves if the user sending the request is is_staff)
+    """
+        
+    form = VehicleForm()
+    if request.method == 'POST':
+        form = VehicleForm(data=request.POST)
+        
+        if form.is_valid():
+
+            if request.user.is_staff:
+                # For Person authorized to create IHA
+
+                vehicle = form.save(commit=False)
+
+                vehicle.created_by = request.user
+                vehicle.save()
+
+                serializer = VehicleSerializer(vehicle)
+
+                response_data = {
+                    "success": True,
+                    "statusCode": '200-OK',
+                    "message": "IHA basarili bir sekilde olusturuldu.",
+                    "data": serializer.data, 
+                }
+
+                return JsonResponse(response_data, status=200)
+            
+            else:
+                # For Person who is not authorized to create IHA
+
+                response_data = {
+                    "success": False,
+                    "statusCode": '400-Bad Request',
+                    "message": "Bu islem icin yetkiniz bulunmamaktadir.",
+                    "data" : None,
+                }
+                return JsonResponse(response_data, status=400)
+        else:
+            response_data = {
+                "success": False,
+                "statusCode": '400-Bad Request',
+                "message": "Bad request",
+                "data" : None,
+            }
+            return JsonResponse(response_data, status=400)
+        
+    context ={'form': form}
+
+
+    return render(request, 'mainApp/vehicle-create.html', context)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def vehicles(request):    
+    page_number = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 10)  
+
+    try:
+        cupons = Vehicle.objects.all()
+        serializer = VehicleSerializer(cupons, many=True)
+
+    except:
+        response_data = {
+            "success": False,
+            "statusCode": '401-Unauthorized',
+            "message": "Insansiz Hava Araclarina erisilemedi.",
+            "data" : None,
+        }
+        return JsonResponse(response_data, status=405)   
+
+    response_data = pagination(serializer.data, page_size, page_number)
+
+    return JsonResponse(response_data, status=200)

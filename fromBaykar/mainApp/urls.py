@@ -13,4 +13,8 @@ urlpatterns = [
 
     path('forgot_password/',  views.forgot_password, name='forgot_password'),
 
+
+    path('vehicles/create/', views.create_vehicle, name='create-vehicle'),
+    
+    path('vehicles/', views.vehicles, name='vehicles'),
 ]
