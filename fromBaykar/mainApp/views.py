@@ -383,6 +383,13 @@ def create_vehicle(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def vehicles(request):    
+    """
+        HTTP Method : GET 
+        Detail : View that allows listing of IHA's 
+        Pagination : api/vehicles/?page=1&page_size=10 
+                    (Each page contains 10 data, can be switched to other pages by changing the page value)
+    """
+
     page_number = request.GET.get('page', 1)
     page_size = request.GET.get('page_size', 10)  
 
@@ -402,3 +409,96 @@ def vehicles(request):
     response_data = pagination(serializer.data, page_size, page_number)
 
     return JsonResponse(response_data, status=200)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_vehicle(request, pk):
+    """
+        HTTP Method : GET 
+        Detail : View that allows retrieve data of selected IHA
+        Endpoint : api/vehicles/<str:pk>/
+    """
+
+    if request.method == 'GET':
+        vehicle =  Vehicle.objects.filter(id=pk)
+        if vehicle.exists():
+            serializer = VehicleSerializer(vehicle, many=True)
+            
+            response_data = {
+                "success": True,
+                "statusCode": '200-OK',
+                "message": None,
+                "data" : serializer.data,
+            }
+
+            return JsonResponse(response_data, status=200)   
+        
+        else:
+            response_data = {
+                "success": False,
+                "statusCode": '400-Bad Request',
+                "message": "Arac bilgilerine erisilemedi",
+                "data" : None,
+            }
+
+            return JsonResponse(response_data, status=400) 
+
+@api_view(['PUT'])
+@permission_classes([IsAdminUser])
+def update_vehicle(request, pk):
+    """
+        HTTP Method : PUT 
+        Detail : View that allows update data of selected IHA (approves if the user sending the request is is_staff)
+        Endpoint : api/vehicles/<str:pk>/update/
+    """
+
+    try:
+        vehicle = Vehicle.objects.get(id=pk)
+        form = VehicleForm(instance=vehicle)
+
+    except Vehicle.DoesNotExist:
+        response_data = {
+            "success": False,
+            "statusCode": '400-Bad Request',
+            "message": "Arac bilgilerine erişilemedi",
+            "data": None,
+        }
+        return JsonResponse(response_data, status=400)
+
+    if request.method == 'POST' or request.method == 'PUT':
+        form = VehicleForm(request.POST, instance=vehicle)
+
+        if form.is_valid():
+            form.save()
+            serializer = VehicleSerializer(vehicle)
+
+            response_data = {
+                "success": True,
+                "statusCode": '200-OK',
+                "message": "Arac bilgileri guncellendi.",
+                "data": serializer.data, 
+            }
+            
+            return JsonResponse(response_data, status=200)
+    
+    
+    context = {'form': form}
+
+    return render(request, 'mainApp/vehicle-update.html', context)
+
+@api_view(['DELETE'])
+@permission_classes([IsAdminUser])
+def delete_vehicle(request, pk):
+    vehicle =  Vehicle.objects.get(id=pk)
+
+    if request.method == 'DELETE':
+        vehicle.delete()
+        
+        response_data = {
+            "success": True,
+            "statusCode": '200-OK',
+            "message": 'Arac basarili bir sekilde silindi.',
+            "data" : None,
+        }
+
+        return JsonResponse(response_data, status=200)    

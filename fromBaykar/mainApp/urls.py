@@ -17,4 +17,10 @@ urlpatterns = [
     path('vehicles/create/', views.create_vehicle, name='create-vehicle'),
     
     path('vehicles/', views.vehicles, name='vehicles'),
+
+    path('vehicles/<int:pk>/', views.get_vehicle, name='detail-vehicle'),
+
+    path('vehicles/<int:pk>/update/', views.update_vehicle, name='update-vehicle'),
+
+    path('vehicles/<int:pk>/delete/', views.delete_vehicle, name='delete-vehicle'),
 ]
