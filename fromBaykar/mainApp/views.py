@@ -390,7 +390,7 @@ def create_vehicle(request):
 def vehicles(request):    
     """
         HTTP Method : GET 
-        Detail : View that allows listing of IHA's 
+        Detail : View that enables listing of IHA's 
         Pagination : api/vehicles/?page=1&page_size=10 
                     (Each page contains 10 data, can be switched to other pages by changing the page value)
     """
@@ -612,4 +612,134 @@ def rent_vehicle(request):
 
 
     return render(request, 'mainApp/vehicle-rent.html', context)
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def rental_records(request):    
+    """
+        HTTP Method : GET 
+        Detail : View that enables listing of Rental Records 
+        Pagination : api/rental-records/?page=1&page_size=10 
+                    (Each page contains 10 data, can be switched to other pages by changing the page value)
+    """
+
+    page_number = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 10)  
+
+    try:
+        cupons = RentalRecord.objects.all()
+        serializer = RentVehicleSerializer(cupons, many=True)
+
+    except:
+        response_data = {
+            "success": False,
+            "statusCode": '401-Unauthorized',
+            "message": "Kiralama kayitlarina erisilemedi.",
+            "data" : None,
+        }
+        return JsonResponse(response_data, status=405)   
+
+    response_data = pagination(serializer.data, page_size, page_number)
+
+    return JsonResponse(response_data, status=200)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_rental_record(request, pk):
+    """
+        HTTP Method : GET 
+        Detail : View that allows retrieve data of selected Rental Record
+        Endpoint : api/rental-records/<str:pk>/
+    """
+
+    if request.method == 'GET':
+        vehicle =  RentalRecord.objects.filter(id=pk)
+        if vehicle.exists():
+            serializer = RentVehicleSerializer(vehicle, many=True)
+            
+            response_data = {
+                "success": True,
+                "statusCode": '200-OK',
+                "message": None,
+                "data" : serializer.data,
+            }
+
+            return JsonResponse(response_data, status=200)   
+        
+        else:
+            response_data = {
+                "success": False,
+                "statusCode": '400-Bad Request',
+                "message": "Kiralama kaydi bilgilerine erisilemedi",
+                "data" : None,
+            }
+
+            return JsonResponse(response_data, status=400) 
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_rental_record(request, pk):
+    """
+        HTTP Method : PUT 
+        Detail : View that allows update data of selected Rental Record
+        Endpoint : api/rental-records/<str:pk>/update/
+    """
+
+    try:
+        rentalRecord = RentalRecord.objects.get(id=pk)        
+        form = RentVehicleForm(instance=rentalRecord)
+
+    except Vehicle.DoesNotExist:
+        response_data = {
+            "success": False,
+            "statusCode": '400-Bad Request',
+            "message": "Kiralama kayit bilgilerine erişilemedi",
+            "data": None,
+        }
+        return JsonResponse(response_data, status=400)
+
+    if request.method == 'POST' or request.method == 'PUT':
+        form = RentVehicleForm(request.POST, instance=rentalRecord)
+
+        if form.is_valid():
+            form.save()
+
+            serializer = RentVehicleSerializer(rentalRecord)
+
+            response_data = {
+                "success": True,
+                "statusCode": '200-OK',
+                "message": "Arac bilgileri guncellendi.",
+                "data": serializer.data, 
+            }
+            
+            return JsonResponse(response_data, status=200)
+    
+    
+    context = {'form': form}
+
+    return render(request, 'mainApp/rental-record-update.html', context)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_rental_record(request, pk):
+    """
+        HTTP Method : DELETE 
+        Detail : View that allows delete selected Rental Record 
+        Endpoint : api/rental-records/<str:pk>/update/
+    """
+     
+    rentalRecord =  RentalRecord.objects.get(id=pk)
+
+    if request.method == 'DELETE':
+        rentalRecord.delete()
+        
+        response_data = {
+            "success": True,
+            "statusCode": '200-OK',
+            "message": 'Kiralama kaydi basarili bir sekilde silindi.',
+            "data" : None,
+        }
+
+        return JsonResponse(response_data, status=200)    
 
