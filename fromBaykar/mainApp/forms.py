@@ -29,3 +29,10 @@ class VehicleForm(forms.ModelForm):
 
         model = Vehicle
         fields = '__all__'
+
+
+class RentVehicleForm(forms.ModelForm):
+    class Meta:
+
+        model = RentalRecord
+        fields = '__all__'

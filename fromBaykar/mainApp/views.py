@@ -162,6 +162,9 @@ def login(request):
     context = {'LoginForm': form}
     return render(request, 'mainApp/login.html', context)
 
+def logout(request):
+    return redirect('login')
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def forgot_password(request):
@@ -328,7 +331,8 @@ def change_password(request):
 def create_vehicle(request):
     """
         HTTP Method : POST 
-        Detail : View that enables the creation of IHA (approves if the user sending the request is is_staff)
+        Detail : View that enables the creation of IHA 
+                (approves if the user sending the request is is_staff)
     """
         
     form = VehicleForm()
@@ -343,6 +347,7 @@ def create_vehicle(request):
                 vehicle = form.save(commit=False)
 
                 vehicle.created_by = request.user
+                vehicle.usable_vehicles = form.cleaned_data['number_of_vehicles']
                 vehicle.save()
 
                 serializer = VehicleSerializer(vehicle)
@@ -448,12 +453,15 @@ def get_vehicle(request, pk):
 def update_vehicle(request, pk):
     """
         HTTP Method : PUT 
-        Detail : View that allows update data of selected IHA (approves if the user sending the request is is_staff)
+        Detail : View that allows update data of selected IHA 
+                (approves if the user sending the request is is_staff)
         Endpoint : api/vehicles/<str:pk>/update/
     """
 
     try:
         vehicle = Vehicle.objects.get(id=pk)
+        number_of_vehicles = vehicle.number_of_vehicles
+        
         form = VehicleForm(instance=vehicle)
 
     except Vehicle.DoesNotExist:
@@ -469,7 +477,13 @@ def update_vehicle(request, pk):
         form = VehicleForm(request.POST, instance=vehicle)
 
         if form.is_valid():
+            difference = form.cleaned_data["number_of_vehicles"] - number_of_vehicles
+
             form.save()
+
+            vehicle.usable_vehicles += difference
+            vehicle.save()
+
             serializer = VehicleSerializer(vehicle)
 
             response_data = {
@@ -489,6 +503,13 @@ def update_vehicle(request, pk):
 @api_view(['DELETE'])
 @permission_classes([IsAdminUser])
 def delete_vehicle(request, pk):
+    """
+        HTTP Method : DELETE 
+        Detail : View that allows delete selected IHA 
+                (approves if the user sending the request is is_staff)
+        Endpoint : api/vehicles/<str:pk>/update/
+    """
+     
     vehicle =  Vehicle.objects.get(id=pk)
 
     if request.method == 'DELETE':
@@ -502,3 +523,93 @@ def delete_vehicle(request, pk):
         }
 
         return JsonResponse(response_data, status=200)    
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def rent_vehicle(request):
+    """
+        HTTP Method : POST 
+        Detail : View that allows Customers to rent the vehicle of their choice 
+                (if the user sending the request is is_staff, receive a notification to contact the manager)
+    """
+        
+    form = RentVehicleForm()
+    if request.method == 'POST':
+        form = RentVehicleForm(data=request.POST)
+        
+        if form.is_valid():
+            
+            # Requesting User is a customer
+            if request.user.is_staff == False:
+            
+                rentalRecord = form.save(commit=False)
+
+                vehicle = form.cleaned_data['vehicle']
+                rental_date = form.cleaned_data['rental_date']
+                pick_up_time = form.cleaned_data['pick_up_time']
+                return_date = form.cleaned_data['return_date']
+                delivery_time = form.cleaned_data['delivery_time']
+
+                # time_elapsed indicates how long the leasing process will last
+                time_elapsed = calculate_time_elapsed(rental_date, pick_up_time, return_date, delivery_time)
+
+                # Check if there is a vehicle available for rent 
+                if vehicle.usable_vehicles > 0:
+                    vehicle.usable_vehicles -= 1
+                    vehicle.save()
+
+                else:
+                    if check_usable_vehicles(vehicle, rental_date, return_date):
+                        vehicle.usable_vehicles -= 1
+                        vehicle.save()
+                    else:
+                        response_data = {
+                            "success": False,
+                            "statusCode": '400-Bad Request',
+                            "message": "Kiralanabilir arac bulunamamaktadir.",
+                            "data" : None,
+                        }
+                        return JsonResponse(response_data, status=400)
+                    
+                rentalRecord.customer = request.user
+                rentalRecord.time_elapsed = time_elapsed
+                rentalRecord.save()
+
+                serializer = RentVehicleSerializer(rentalRecord)
+
+                response_data = {
+                    "success": True,
+                    "statusCode": '200-OK',
+                    "message": "IHA kiralama isleminiz basarili bir sekilde gerceklesti.",
+                    "data": serializer.data, 
+                }
+
+                return JsonResponse(response_data, status=200)
+            
+            # Staff's can't rent vehicle on their own behalf
+            else:
+                
+                response_data = {
+                    "success": False,
+                    "statusCode": '400-Bad Request',
+                    "message": "Personel hesabinizla kiralama islemi yapmak icin lutfen yoneticinizle iletisime geciniz.",
+                    "data" : None,
+                }
+                return JsonResponse(response_data, status=400)
+            
+        # form not valid
+        else:
+            response_data = {
+                "success": False,
+                "statusCode": '400-Bad Request',
+                "message": "Sunucu istenmeyen bir hata ile karsilasti",
+                "data" : None,
+            }
+            return JsonResponse(response_data, status=400)
+        
+    context ={'form': form}
+
+
+    return render(request, 'mainApp/vehicle-rent.html', context)
+

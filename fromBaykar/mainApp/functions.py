@@ -1,6 +1,8 @@
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 
+from datetime import datetime
+from .models import *
 
 def pagination(data, page_size, page_number):    
     
@@ -56,3 +58,34 @@ def pagination(data, page_size, page_number):
 
     return response_data
 
+
+def calculate_time_elapsed(rental_date, pick_up_time, return_date, delivery_time):
+    """
+        Function that calculates the time between entered dates in hours
+    """
+    rental_start = datetime.combine(rental_date, pick_up_time)
+    rental_end = datetime.combine(return_date, delivery_time)
+
+    time_difference = rental_end - rental_start
+
+    # Zaman farkını saat cinsine dönüştür
+    hours_elapsed = time_difference.total_seconds() / 3600
+
+    return hours_elapsed
+
+def check_usable_vehicles(vehicle, rental_date, return_date):
+
+    control_flag = False
+
+    rentalLogs = RentalRecord.objects.filter(rental_date__lte=return_date, return_date__gte=rental_date)
+    total_capacity = 1
+
+    for rl in rentalLogs:
+        total_capacity += 1
+
+        if total_capacity > vehicle.number_of_vehicles:
+            control_flag = False
+            return control_flag
+        
+    control_flag = True
+    return control_flag
