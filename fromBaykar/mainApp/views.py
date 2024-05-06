@@ -742,4 +742,3 @@ def delete_rental_record(request, pk):
         }
 
         return JsonResponse(response_data, status=200)    
-
