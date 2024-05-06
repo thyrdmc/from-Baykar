@@ -3,6 +3,7 @@ from django.http import JsonResponse, HttpResponse
 
 from .forms import *
 from .serializers import *
+from .functions import *
 
 from django.views.decorators.csrf import csrf_exempt
 
@@ -29,9 +30,10 @@ from django.utils.http import urlsafe_base64_decode
 
 from django.core.mail import EmailMessage
 
-import random, string
+import string
 
-from .functions import *
+from django.db.models import Q
+
 
 @csrf_exempt
 def register(request):
@@ -162,6 +164,7 @@ def login(request):
     context = {'LoginForm': form}
     return render(request, 'mainApp/login.html', context)
 
+@csrf_exempt
 def logout(request):
     return redirect('login')
 
@@ -393,14 +396,26 @@ def vehicles(request):
         Detail : View that enables listing of IHA's 
         Pagination : api/vehicles/?page=1&page_size=10 
                     (Each page contains 10 data, can be switched to other pages by changing the page value)
+        Searching & Filtering : 
+                    api/vehicles/?search=kizilelma
     """
 
     page_number = request.GET.get('page', 1)
     page_size = request.GET.get('page_size', 10)  
+    search_query = request.GET.get('search', None)
+
 
     try:
-        cupons = Vehicle.objects.all()
-        serializer = VehicleSerializer(cupons, many=True)
+        vehicles = Vehicle.objects.all()
+
+        # Searching can be done according to fields Name, Brand and Model
+        if search_query:
+            vehicles = vehicles.filter(
+                Q(name__icontains=search_query) |
+                Q(brand__icontains=search_query) |
+                Q(model__icontains=search_query) 
+            )
+        serializer = VehicleSerializer(vehicles, many=True)
 
     except:
         response_data = {
@@ -621,14 +636,35 @@ def rental_records(request):
         Detail : View that enables listing of Rental Records 
         Pagination : api/rental-records/?page=1&page_size=10 
                     (Each page contains 10 data, can be switched to other pages by changing the page value)
+        Searching & Filtering : 
+                    api/rental-records/?start_date=2024-05-06&end_date=2024-06-10
+                    api/rental-records/?search=taha
     """
 
     page_number = request.GET.get('page', 1)
     page_size = request.GET.get('page_size', 10)  
 
+    start_date = request.GET.get('start_date', None)
+    end_date = request.GET.get('end_date', None)
+
+    search_query = request.GET.get('search', None)
+
     try:
-        cupons = RentalRecord.objects.all()
-        serializer = RentVehicleSerializer(cupons, many=True)
+        rentalRecords = RentalRecord.objects.all()
+
+        # Listing the vehicles rented for the entered date range
+        if start_date and end_date:
+            rentalRecords = rentalRecords.filter(
+                Q(rental_date__lte=end_date) & Q(return_date__gte=start_date)
+            )
+        
+        # Searching by the username of the person who made the rental
+        if search_query:
+            rentalRecords = rentalRecords.filter(
+                Q(customer__username__icontains=search_query)
+            )
+
+        serializer = RentVehicleSerializer(rentalRecords, many=True)
 
     except:
         response_data = {
