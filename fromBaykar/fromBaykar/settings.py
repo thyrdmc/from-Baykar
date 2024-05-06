@@ -43,9 +43,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'mainApp',        # Django App
     'rest_framework',
     'corsheaders',
-    'mainApp',        # Django App
 ]
 
 MIDDLEWARE = [
@@ -61,8 +61,8 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-"http://localhost:8080",
-"http://127.0.0.1:9000"
+"http://localhost:5173",
+"http://127.0.0.1:5173"
 ]
 
 ROOT_URLCONF = 'fromBaykar.urls'
